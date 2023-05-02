@@ -1,4 +1,4 @@
-use crate::gateway::Gateway;
+use crate::gateway::{Gateway, GatewayListeners, GatewayListenersTlsCertificateRefs};
 use crate::{Error, Result};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -90,34 +90,31 @@ impl BucketCert {
             Some(status) => {
                 if status.created == true {
                 } else {
+                    let query_gw = gateway.get("eg").await.map_err(Error::KubeError)?;
+                    let mut new_listeners = query_gw.spec.listeners.clone();
+                    new_listeners.push(GatewayListeners {
+                        allowed_routes: None,
+                        hostname: Some(format!("{bucket_name}.data.gi.aruna-storage.org")),
+                        name: bucket_name.to_string(),
+                        port: 443,
+                        protocol: "HTTPS".to_string(),
+                        tls: Some(crate::gateway::GatewayListenersTls {
+                            certificate_refs: Some(vec![GatewayListenersTlsCertificateRefs {
+                                group: None,
+                                kind: Some("Secret".to_string()),
+                                name: format!("{bucket_name}"),
+                                namespace: Some(ns),
+                            }]),
+                            mode: Some(crate::gateway::GatewayListenersTlsMode::Terminate),
+                            options: None,
+                        }),
+                    });
                     // Update gateway
-                    let new_listener = Patch::Strategic(json!({
+                    let new_listener = Patch::Apply(json!({
                         "apiVersion": "gateway.networking.k8s.io/v1alpha2",
                         "kind": "Gateway",
                         "spec": {
-                            "listeners": {
-                                "allowedRoutes": [
-                                    {
-                                        "namespaces": {
-                                            "from": "Same"
-                                        }
-                                    }
-                                ],
-
-                              "hostname": "{bucket_name}.data.gi.aruna-storage.org",
-                              "name": "{bucket_name}",
-                              "port": 443,
-                              "protocol": "HTTPS",
-                              "tls": {
-                                "certificateRefs": [{
-                                    "group": "",
-                                    "kind": "Secret",
-                                    "name": "{bucket_name}",
-                                    "namespace": "{ns}"
-                                }],
-                                "mode": "Terminate"
-                              }
-                            }
+                            "listeners": new_listeners
                         }
                     }));
                     let ps = PatchParams::apply("cntrlr");
@@ -139,34 +136,30 @@ impl BucketCert {
                 }
             }
             None => {
+                let mut new_listeners = query_gw.spec.listeners.clone();
+                new_listeners.push(GatewayListeners {
+                    allowed_routes: None,
+                    hostname: Some(format!("{bucket_name}.data.gi.aruna-storage.org")),
+                    name: bucket_name.to_string(),
+                    port: 443,
+                    protocol: "HTTPS".to_string(),
+                    tls: Some(crate::gateway::GatewayListenersTls {
+                        certificate_refs: Some(vec![GatewayListenersTlsCertificateRefs {
+                            group: None,
+                            kind: Some("Secret".to_string()),
+                            name: format!("{bucket_name}"),
+                            namespace: Some(ns),
+                        }]),
+                        mode: Some(crate::gateway::GatewayListenersTlsMode::Terminate),
+                        options: None,
+                    }),
+                });
                 // Update gateway
-                let new_listener = Patch::Strategic(json!({
+                let new_listener = Patch::Apply(json!({
                     "apiVersion": "gateway.networking.k8s.io/v1alpha2",
                     "kind": "Gateway",
                     "spec": {
-                        "listeners": {
-                            "allowedRoutes": [
-                                {
-                                    "namespaces": {
-                                        "from": "Same"
-                                    }
-                                }
-                            ],
-
-                            "hostname": "{bucket_name}.data.gi.aruna-storage.org",
-                            "name": "{bucket_name}",
-                            "port": 443,
-                            "protocol": "HTTPS",
-                            "tls": {
-                            "certificateRefs": [{
-                                "group": "",
-                                "kind": "Secret",
-                                "name": "{bucket_name}",
-                                "namespace": "{ns}"
-                            }],
-                            "mode": "Terminate"
-                            }
-                        }
+                        "listeners": new_listeners
                     }
                 }));
                 let ps = PatchParams::apply("cntrlr");
