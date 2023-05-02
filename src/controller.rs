@@ -136,6 +136,7 @@ impl BucketCert {
                 }
             }
             None => {
+                let query_gw = gateway.get("eg").await.map_err(Error::KubeError)?;
                 let mut new_listeners = query_gw.spec.listeners.clone();
                 new_listeners.push(GatewayListeners {
                     allowed_routes: None,
