@@ -26,4 +26,5 @@ impl Error {
 
 /// Expose all controller components used by main
 pub mod controller;
+pub mod gateway;
 pub use crate::controller::*;

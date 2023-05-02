@@ -1,7 +1,7 @@
+use crate::gateway::Gateway;
 use crate::{Error, Result};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
-use k8s_gateway_api::Gateway;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -9,7 +9,7 @@ use kube::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
         finalizer::{finalizer, Event as Finalizer},
-        watcher::{self, Config},
+        watcher::Config,
     },
     CustomResource, Resource,
 };
@@ -81,12 +81,12 @@ impl BucketCert {
         let recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
-        let bcerts: Api<BucketCert> = Api::namespaced(client, &ns);
+        let bcerts: Api<BucketCert> = Api::namespaced(client.clone(), &ns);
         let gateway: Api<Gateway> = Api::namespaced(client, &ns);
 
         let bucket_name = self.spec.bucket.to_string();
 
-        match self.status {
+        match &self.status {
             Some(status) => {
                 if status.created == true {
                 } else {
@@ -97,8 +97,10 @@ impl BucketCert {
                         "spec": {
                             "listeners": {
                                 "allowedRoutes": [
-                                    "namespaces": {
-                                        "from": "Same"
+                                    {
+                                        "namespaces": {
+                                            "from": "Same"
+                                        }
                                     }
                                 ],
 
@@ -108,9 +110,9 @@ impl BucketCert {
                               "protocol": "HTTPS",
                               "tls": {
                                 "certificateRefs": [{
-                                    "group": ""
-                                    "kind": "Secret"
-                                    "name": "{bucket_name}"
+                                    "group": "",
+                                    "kind": "Secret",
+                                    "name": "{bucket_name}",
                                     "namespace": "{ns}"
                                 }],
                                 "mode": "Terminate"
@@ -144,8 +146,10 @@ impl BucketCert {
                     "spec": {
                         "listeners": {
                             "allowedRoutes": [
-                                "namespaces": {
-                                    "from": "Same"
+                                {
+                                    "namespaces": {
+                                        "from": "Same"
+                                    }
                                 }
                             ],
 
@@ -155,9 +159,9 @@ impl BucketCert {
                             "protocol": "HTTPS",
                             "tls": {
                             "certificateRefs": [{
-                                "group": ""
-                                "kind": "Secret"
-                                "name": "{bucket_name}"
+                                "group": "",
+                                "kind": "Secret",
+                                "name": "{bucket_name}",
                                 "namespace": "{ns}"
                             }],
                             "mode": "Terminate"
