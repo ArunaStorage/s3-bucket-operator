@@ -1,6 +1,7 @@
 use crate::{Error, Result};
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
+use k8s_gateway_api::Gateway;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -8,7 +9,7 @@ use kube::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
         finalizer::{finalizer, Event as Finalizer},
-        watcher::Config,
+        watcher::{self, Config},
     },
     CustomResource, Resource,
 };
@@ -77,32 +78,117 @@ impl BucketCert {
     // Reconcile (for non-finalizer related changes)
     async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action> {
         let client = ctx.client.clone();
-        let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
+        let recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let bcerts: Api<BucketCert> = Api::namespaced(client, &ns);
+        let gateway: Api<Gateway> = Api::namespaced(client, &ns);
 
-        // let should_hide = self.spec.hide;
-        // if !self.was_hidden() && should_hide {
-        //     // send an event once per hide
-        //     recorder
-        //         .publish(Event {
-        //             type_: EventType::Normal,
-        //             reason: "HideRequested".into(),
-        //             note: Some(format!("Hiding `{name}`")),
-        //             action: "Hiding".into(),
-        //             secondary: None,
-        //         })
-        //         .await
-        //         .map_err(Error::KubeError)?;
-        // }
+        let bucket_name = self.spec.bucket.to_string();
+
+        match self.status {
+            Some(status) => {
+                if status.created == true {
+                } else {
+                    // Update gateway
+                    let new_listener = Patch::Strategic(json!({
+                        "apiVersion": "gateway.networking.k8s.io/v1alpha2",
+                        "kind": "Gateway",
+                        "spec": {
+                            "listeners": {
+                                "allowedRoutes": [
+                                    "namespaces": {
+                                        "from": "Same"
+                                    }
+                                ],
+
+                              "hostname": "{bucket_name}.data.gi.aruna-storage.org",
+                              "name": "{bucket_name}",
+                              "port": 443,
+                              "protocol": "HTTPS",
+                              "tls": {
+                                "certificateRefs": [{
+                                    "group": ""
+                                    "kind": "Secret"
+                                    "name": "{bucket_name}"
+                                    "namespace": "{ns}"
+                                }],
+                                "mode": "Terminate"
+                              }
+                            }
+                        }
+                    }));
+                    let ps = PatchParams::apply("cntrlr").force();
+                    let _o = gateway
+                        .patch("eg", &ps, &new_listener) // For now the name is static eg
+                        .await
+                        .map_err(Error::KubeError)?;
+
+                    recorder
+                        .publish(Event {
+                            type_: EventType::Normal,
+                            reason: "Created entry".into(),
+                            note: Some(format!("Created cert entry for `{name}`")),
+                            action: "Created".into(),
+                            secondary: None,
+                        })
+                        .await
+                        .map_err(Error::KubeError)?;
+                }
+            }
+            None => {
+                // Update gateway
+                let new_listener = Patch::Strategic(json!({
+                    "apiVersion": "gateway.networking.k8s.io/v1alpha2",
+                    "kind": "Gateway",
+                    "spec": {
+                        "listeners": {
+                            "allowedRoutes": [
+                                "namespaces": {
+                                    "from": "Same"
+                                }
+                            ],
+
+                            "hostname": "{bucket_name}.data.gi.aruna-storage.org",
+                            "name": "{bucket_name}",
+                            "port": 443,
+                            "protocol": "HTTPS",
+                            "tls": {
+                            "certificateRefs": [{
+                                "group": ""
+                                "kind": "Secret"
+                                "name": "{bucket_name}"
+                                "namespace": "{ns}"
+                            }],
+                            "mode": "Terminate"
+                            }
+                        }
+                    }
+                }));
+                let ps = PatchParams::apply("cntrlr").force();
+                let _o = gateway
+                    .patch("eg", &ps, &new_listener) // For now the name is static eg
+                    .await
+                    .map_err(Error::KubeError)?;
+                recorder
+                    .publish(Event {
+                        type_: EventType::Normal,
+                        reason: "Created entry".into(),
+                        note: Some(format!("Created cert entry for `{name}`")),
+                        action: "Created".into(),
+                        secondary: None,
+                    })
+                    .await
+                    .map_err(Error::KubeError)?;
+            }
+        }
         if name == "illegal" {
             return Err(Error::IllegalDocument); // error names show up in metrics
         }
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
-            "apiVersion": "kube.rs/v1",
-            "kind": "Document",
+            "apiVersion": "aruna-storage.org/v1alpha1",
+            "kind": "BucketCert",
             "status": BucketCertStatus {
                 compacted: false,
                 created: true,
@@ -114,8 +200,8 @@ impl BucketCert {
             .await
             .map_err(Error::KubeError)?;
 
-        // If no events were received, check back every 5 minutes
-        Ok(Action::requeue(Duration::from_secs(5 * 60)))
+        // If no events were received, check back every 60 minutes
+        Ok(Action::requeue(Duration::from_secs(60 * 60)))
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
@@ -152,7 +238,7 @@ impl Default for Diagnostics {
     fn default() -> Self {
         Self {
             last_event: Utc::now(),
-            reporter: "doc-controller".into(),
+            reporter: "s3bto-controller".into(),
         }
     }
 }
