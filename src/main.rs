@@ -1,8 +1,9 @@
 pub use controller;
+use simple_logger::SimpleLogger;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let controller = controller::run();
-    tokio::join!(controller);
+    SimpleLogger::new().init().unwrap();
+    let controller = controller::run().await;
     Ok(())
 }

@@ -120,7 +120,7 @@ impl BucketCert {
                             }
                         }
                     }));
-                    let ps = PatchParams::apply("cntrlr").force();
+                    let ps = PatchParams::apply("cntrlr");
                     let _o = gateway
                         .patch("eg", &ps, &new_listener) // For now the name is static eg
                         .await
@@ -169,7 +169,7 @@ impl BucketCert {
                         }
                     }
                 }));
-                let ps = PatchParams::apply("cntrlr").force();
+                let ps = PatchParams::apply("cntrlr");
                 let _o = gateway
                     .patch("eg", &ps, &new_listener) // For now the name is static eg
                     .await
@@ -261,6 +261,11 @@ pub async fn run() {
     if let Err(e) = bcert.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
+        std::process::exit(1);
+    }
+    let gw = Api::<Gateway>::all(client.clone());
+    if let Err(e) = gw.list(&ListParams::default().limit(1)).await {
+        error!("Gateway CRD is not queryable; {e:?}. Is the CRD installed?");
         std::process::exit(1);
     }
     Controller::new(bcert, Config::default().any_semantic())

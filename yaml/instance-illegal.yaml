@@ -1,9 +1,6 @@
-apiVersion: kube.rs/v1
-kind: Document
+apiVersion: aruna-storage.org/v1alpha1
+kind: BucketCert
 metadata:
-  name: illegal
+  name: new-test-bucket-cert
 spec:
-  title: Breaking the law
-  hide: false
-  content: |
-    This document will cause the reconcile fn to return an Err which will be visible in the metrics of the controller.
+  bucket: "this.is.a.new.test"
