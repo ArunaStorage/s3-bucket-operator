@@ -4,12 +4,12 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: doc-controller
+  name: bto-controller
+  namespace: aruna-prod
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.12.5"
-  namespace: default
+    app: bto-controller
+    app.kubernetes.io/name: bto-controller
+    app.kubernetes.io/version: "0.1.0"
 automountServiceAccountToken: true
 ---
 # Source: doc-controller/templates/rbac.yaml
@@ -17,79 +17,61 @@ automountServiceAccountToken: true
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: doc-controller
+  name: bto-controller
 rules:
-  - apiGroups: ["kube.rs"]
-    resources: ["documents", "documents/status"]
+  - apiGroups: ["aruna-storage.org"]
+    resources: ["bucketcert", "bucketcert/status"]
     verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["gateway"]
+    verbs: ["get", "list", "watch", "patch"]
 ---
 # Source: doc-controller/templates/rbac.yaml
 # Binding the role to the account
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: doc-controller
+  name: bto-controller
 subjects:
 - kind: ServiceAccount
-  namespace: default
-  name: doc-controller
+  namespace: aruna-prod
+  name: bto-controller
 roleRef:
   kind: ClusterRole
-  name: doc-controller
+  name: bto-controller
   apiGroup: rbac.authorization.k8s.io
----
-# Source: doc-controller/templates/service.yaml
-# Expose the http port of the service
-apiVersion: v1
-kind: Service
-metadata:
-  name: doc-controller
-  namespace: default
-  labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.12.5"
-spec:
-  type: ClusterIP
-  ports:
-  - port: 80
-    targetPort: 8080
-    protocol: TCP
-    name: http
-  selector:
-    app: doc-controller
 ---
 # Source: doc-controller/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: doc-controller
-  namespace: default
+  name: bto-controller
+  namespace: aruna-prod
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.12.5"
+    app: bto-controller
+    app.kubernetes.io/name: bto-controller
+    app.kubernetes.io/version: "0.1.0"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: doc-controller
+      app: bto-controller
   template:
     metadata:
       labels:
-        app: doc-controller
+        app: bto-controller
       annotations:
-        kubectl.kubernetes.io/default-container: doc-controller
+        kubectl.kubernetes.io/default-container: bto-controller
     spec:
-      serviceAccountName: doc-controller
+      serviceAccountName: bto-controller
       securityContext:
         {}
       containers:
-      - name: doc-controller
-        image: "clux/controller:0.12.5"
+      - name: bto-controller
+        image: "harbor.computational.bio.uni-giessen.de/aruna/s3-bucket-tls-manager:latest"
         imagePullPolicy: IfNotPresent
         securityContext:
           {}
@@ -100,19 +82,3 @@ spec:
           requests:
             cpu: 50m
             memory: 100Mi
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        env:
-        # We are pointing to tempo or grafana tracing agent's otlp grpc receiver port
-        - name: OPENTELEMETRY_ENDPOINT_URL
-          value: "https://promstack-tempo.monitoring.svc.cluster.local:4317"
-        - name: RUST_LOG
-          value: "info,kube=debug,controller=debug"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 5
-          periodSeconds: 5
