@@ -22,7 +22,7 @@ use tokio::{sync::RwLock, time::Duration};
 
 pub static DOCUMENT_FINALIZER: &str = "bcerts.aruna-storage.org";
 
-/// Generate the Kubernetes wrapper struct `Document` from our Spec and Status struct
+/// Generate the Kubernetes wrapper struct `BucketCert` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -37,7 +37,7 @@ pub static DOCUMENT_FINALIZER: &str = "bcerts.aruna-storage.org";
 pub struct BucketCertSpec {
     pub bucket: String,
 }
-/// The status object of `Document`
+/// The status object of `BucketCert`
 #[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
 pub struct BucketCertStatus {
     pub compacted: bool,

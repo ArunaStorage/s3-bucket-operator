@@ -21,7 +21,7 @@ spec:
         properties:
           spec:
             description: |-
-              Generate the Kubernetes wrapper struct `Document` from our Spec and Status struct
+              Generate the Kubernetes wrapper struct `BucketCert` from our Spec and Status struct
 
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
@@ -31,7 +31,7 @@ spec:
             - bucket
             type: object
           status:
-            description: The status object of `Document`
+            description: The status object of `BucketCert`
             nullable: true
             properties:
               compacted:
