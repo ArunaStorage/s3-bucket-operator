@@ -13,14 +13,20 @@ use kube::{
     },
     CustomResource, Resource,
 };
+use lazy_static::lazy_static;
 use log::{error, info, warn};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::env;
 use std::sync::Arc;
 use tokio::{sync::RwLock, time::Duration};
 
 pub static DOCUMENT_FINALIZER: &str = "bcerts.aruna-storage.org";
+
+lazy_static! {
+    static ref URL: String = env::var("PROXYURL").expect("PROXYURL is not set");
+}
 
 /// Generate the Kubernetes wrapper struct `BucketCert` from our Spec and Status struct
 ///
@@ -94,7 +100,7 @@ impl BucketCert {
                     let mut new_listeners = query_gw.spec.listeners.clone();
                     new_listeners.push(GatewayListeners {
                         allowed_routes: None,
-                        hostname: Some(format!("{bucket_name}.data.gi.aruna-storage.org")),
+                        hostname: Some(format!("{bucket_name}.{}", *URL)),
                         name: bucket_name.to_string(),
                         port: 443,
                         protocol: "HTTPS".to_string(),
@@ -140,7 +146,7 @@ impl BucketCert {
                 let mut new_listeners = query_gw.spec.listeners.clone();
                 new_listeners.push(GatewayListeners {
                     allowed_routes: None,
-                    hostname: Some(format!("{bucket_name}.data.gi.aruna-storage.org")),
+                    hostname: Some(format!("{bucket_name}.{}", *URL)),
                     name: bucket_name.to_string(),
                     port: 443,
                     protocol: "HTTPS".to_string(),
